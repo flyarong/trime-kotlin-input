@@ -17,6 +17,8 @@
 [<img alt='Google Play 立即下载' src='https://play.google.com/intl/en_us/badges/images/generic/zh-cn_badge_web_generic.png' height='80px'/>](https://play.google.com/store/apps/details?id=com.osfans.trime)
 [<img alt='酷安' src='https://static.coolapk.com/static/web/v8/img/icon.png' height='60px'/>](https://www.coolapk.com/apk/com.osfans.trime)
 
+- 每夜版 [点击下载](https://github.com/osfans/trime/releases/tag/nightly)
+
 - 测试版 [点击下载](https://github.com/osfans/trime/actions)
 
 - 配置文档 [rimerc](https://github.com/Bambooin/rimerc)
@@ -46,6 +48,8 @@ TRIME 是 Tongwen RIME 或是 ThaeRvInputMEthod 的缩写:
 ### 准备
 
 开发者应正确安装配置好 Android SDK 和 Android NDK。如果还不熟悉 Android 开发，建议安装 Android Studio，它会自动安装并配置 Android 开发环境。
+
+对 JDK（OpenJDK）版本的要求是 17 或 21。
 
 ### 构建
 
