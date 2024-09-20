@@ -1,29 +1,19 @@
-/*
- * Copyright (C) 2015-present, osfans
- * waxaca@163.com https://github.com/osfans
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.core
 
-import com.osfans.trime.data.AppPrefs
-import com.osfans.trime.data.DataManager
+import com.osfans.trime.data.base.DataManager
 import com.osfans.trime.data.opencc.OpenCCDictManager
 import com.osfans.trime.data.schema.SchemaManager
+import com.osfans.trime.util.appContext
+import com.osfans.trime.util.isAsciiPrintable
+import com.osfans.trime.util.isStorageAvailable
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import kotlin.system.measureTimeMillis
 
@@ -32,75 +22,221 @@ import kotlin.system.measureTimeMillis
  *
  * @see [librime](https://github.com/rime/librime)
  */
-class Rime(fullCheck: Boolean) {
-    val notificationFlow = notificationFlow_.asSharedFlow()
+class Rime :
+    RimeApi,
+    RimeLifecycleOwner {
+    private val lifecycleImpl = RimeLifecycleImpl()
+    override val lifecycle get() = lifecycleImpl
 
-    init {
-        startup(fullCheck)
+    override val notificationFlow = notificationFlow_.asSharedFlow()
+    override val responseFlow = responseFlow_.asSharedFlow()
+    override val stateFlow get() = lifecycle.currentStateFlow
+
+    override val isReady: Boolean
+        get() = lifecycle.currentStateFlow.value == RimeLifecycle.State.READY
+
+    override var schemaItemCached = SchemaItem(".default")
+        private set
+
+    override var inputStatusCached = InputStatus()
+        private set
+
+    private val dispatcher =
+        RimeDispatcher(
+            object : RimeDispatcher.RimeLooper {
+                override fun nativeStartup(fullCheck: Boolean) {
+                    DataManager.dirFireChange()
+                    DataManager.sync()
+
+                    val sharedDataDir = DataManager.sharedDataDir.absolutePath
+                    val userDataDir = DataManager.userDataDir.absolutePath
+                    Timber.i("Starting up Rime APIs ...")
+                    startupRime(sharedDataDir, userDataDir, fullCheck)
+
+                    SchemaManager.init(getCurrentRimeSchema())
+                    updateStatus()
+
+                    OpenCCDictManager.buildOpenCCDict()
+                    lifecycleImpl.emitState(RimeLifecycle.State.READY)
+                }
+
+                override fun nativeFinalize() {
+                    exitRime()
+                }
+            },
+        )
+
+    private suspend inline fun <T> withRimeContext(crossinline block: suspend () -> T): T =
+        withContext(dispatcher) {
+            block()
+        }
+
+    override suspend fun isEmpty(): Boolean =
+        withRimeContext {
+            getCurrentRimeSchema() == ".default" // 無方案
+        }
+
+    override suspend fun processKey(
+        value: Int,
+        modifiers: UInt,
+    ): Boolean =
+        withRimeContext {
+            processRimeKey(value, modifiers.toInt()).also { if (it) updateContext() }
+        }
+
+    override suspend fun processKey(
+        value: KeyValue,
+        modifiers: KeyModifiers,
+    ): Boolean =
+        withRimeContext {
+            processRimeKey(value.value, modifiers.toInt()).also { if (it) updateContext() }
+        }
+
+    override suspend fun selectCandidate(idx: Int): Boolean =
+        withRimeContext {
+            selectRimeCandidate(idx).also { if (it) updateContext() }
+        }
+
+    override suspend fun forgetCandidate(idx: Int): Boolean =
+        withRimeContext {
+            forgetRimeCandidate(idx).also { if (it) updateContext() }
+        }
+
+    override suspend fun availableSchemata(): Array<SchemaItem> = withRimeContext { getAvailableRimeSchemaList() }
+
+    override suspend fun enabledSchemata(): Array<SchemaItem> = withRimeContext { getSelectedRimeSchemaList() }
+
+    override suspend fun setEnabledSchemata(schemaIds: Array<String>) = withRimeContext { selectRimeSchemas(schemaIds) }
+
+    override suspend fun selectedSchemata(): Array<SchemaItem> = withRimeContext { getRimeSchemaList() }
+
+    override suspend fun selectedSchemaId(): String = withRimeContext { getCurrentRimeSchema() }
+
+    override suspend fun selectSchema(schemaId: String) = withRimeContext { selectRimeSchema(schemaId) }
+
+    override suspend fun currentSchema() =
+        withRimeContext {
+            val schema = getRimeStatus()?.let { SchemaItem(it.schemaId, it.schemaName) }
+            schema ?: schemaItemCached
+        }
+
+    override suspend fun commitComposition(): Boolean = withRimeContext { commitRimeComposition().also { updateContext() } }
+
+    override suspend fun clearComposition() =
+        withRimeContext {
+            clearRimeComposition()
+            updateContext()
+        }
+
+    override suspend fun setRuntimeOption(
+        option: String,
+        value: Boolean,
+    ): Unit =
+        withRimeContext {
+            setRimeOption(option, value)
+        }
+
+    override suspend fun getRuntimeOption(option: String): Boolean =
+        withRimeContext {
+            getRimeOption(option)
+        }
+
+    override suspend fun getCandidates(
+        startIndex: Int,
+        limit: Int,
+    ): Array<CandidateItem> =
+        withRimeContext {
+            getRimeCandidates(startIndex, limit) ?: emptyArray()
+        }
+
+    private fun handleRimeNotification(notif: RimeNotification<*>) {
+        when (notif) {
+            is RimeNotification.SchemaNotification -> schemaItemCached = notif.value
+            else -> {}
+        }
+    }
+
+    private fun handleRimeResponse(response: RimeResponse) {
+        if (response.status != null) {
+            val (item, status) =
+                response.status.run {
+                    SchemaItem(schemaId, schemaName) to
+                        InputStatus(isDisabled, isComposing, isAsciiMode, isFullShape, isSimplified, isTraditional, isAsciiPunch)
+                }
+            inputStatusCached = status
+            if (item != schemaItemCached) {
+                schemaItemCached = item
+            }
+        }
+    }
+
+    fun startup(fullCheck: Boolean) {
+        if (lifecycle.currentStateFlow.value != RimeLifecycle.State.STOPPED) {
+            Timber.w("Skip starting rime: not at stopped state!")
+            return
+        }
+        if (appContext.isStorageAvailable()) {
+            registerRimeNotificationHandler(::handleRimeNotification)
+            registerRimeResponseHandler(::handleRimeResponse)
+            lifecycleImpl.emitState(RimeLifecycle.State.STARTING)
+            dispatcher.start(fullCheck)
+        }
+    }
+
+    fun finalize() {
+        if (lifecycle.currentStateFlow.value != RimeLifecycle.State.READY) {
+            Timber.w("Skip stopping rime: not at ready state!")
+            return
+        }
+        lifecycleImpl.emitState(RimeLifecycle.State.STOPPING)
+        Timber.i("Rime finalize()")
+        dispatcher.stop().let {
+            if (it.isNotEmpty()) {
+                Timber.w("${it.size} job(s) didn't get a chance to run!")
+            }
+        }
+        lifecycleImpl.emitState(RimeLifecycle.State.STOPPED)
+        unregisterRimeNotificationHandler(::handleRimeNotification)
+        unregisterRimeResponseHandler(::handleRimeResponse)
     }
 
     companion object {
-        private var instance: Rime? = null
-
-        @JvmStatic
-        fun getInstance(fullCheck: Boolean = false): Rime {
-            if (instance == null) instance = Rime(fullCheck)
-            return instance!!
-        }
-
-        private var mContext: RimeContext? = null
-        private var mStatus: RimeStatus? = null
-        private var isHandlingRimeNotification = false
+        var inputContext: RimeProto.Context? = null
+        private var mStatus: RimeProto.Status? = null
         private val notificationFlow_ =
-            MutableSharedFlow<RimeNotification>(
+            MutableSharedFlow<RimeNotification<*>>(
                 extraBufferCapacity = 15,
                 onBufferOverflow = BufferOverflow.DROP_OLDEST,
             )
+
+        private val responseFlow_ =
+            MutableSharedFlow<RimeResponse>(
+                extraBufferCapacity = 15,
+                onBufferOverflow = BufferOverflow.DROP_LATEST,
+            )
+
+        private val notificationHandlers = ArrayList<(RimeNotification<*>) -> Unit>()
+
+        private val responseHandlers = ArrayList<(RimeResponse) -> Unit>()
 
         init {
             System.loadLibrary("rime_jni")
         }
 
-        private fun startup(fullCheck: Boolean) {
-            isHandlingRimeNotification = false
-
-            DataManager.sync()
-
-            val sharedDataDir = AppPrefs.defaultInstance().profile.sharedDataDir
-            val userDataDir = AppPrefs.defaultInstance().profile.userDataDir
-
-            Timber.i("Starting up Rime APIs ...")
-            startupRime(sharedDataDir, userDataDir, fullCheck)
-
-            Timber.i("Initializing schema stuffs after starting up ...")
-            SchemaManager.init(getCurrentRimeSchema())
-            updateStatus()
-        }
-
-        fun destroy() {
-            exitRime()
-            instance = null
-        }
-
-        fun deploy() {
-            destroy()
-            getInstance(true)
-            OpenCCDictManager.buildOpenCCDict()
-        }
-
         fun updateStatus() {
             SchemaManager.updateSwitchOptions()
             measureTimeMillis {
-                mStatus = getRimeStatus() ?: RimeStatus()
+                mStatus = getRimeStatus()
             }.also { Timber.d("Took $it ms to get status") }
         }
 
         fun updateContext() {
             Timber.d("Update Rime context ...")
             measureTimeMillis {
-                mContext = getRimeContext() ?: RimeContext()
+                inputContext = getRimeContext()
             }.also { Timber.d("Took $it ms to get context") }
             updateStatus()
+            requestRimeResponse()
         }
 
         /*
@@ -139,40 +275,17 @@ class Rime(fullCheck: Boolean) {
         val currentSchemaName get() = mStatus?.schemaName ?: ""
 
         @JvmStatic
-        fun hasMenu(): Boolean {
-            return isComposing && mContext?.menu?.numCandidates != 0
-        }
+        fun hasMenu(): Boolean = !inputContext?.menu?.candidates.isNullOrEmpty()
 
         @JvmStatic
-        fun hasLeft(): Boolean {
-            return hasMenu() && mContext?.menu?.pageNo != 0
-        }
+        fun hasLeft(): Boolean = hasMenu() && inputContext?.menu?.pageNumber != 0
 
         @JvmStatic
-        fun hasRight(): Boolean {
-            return hasMenu() && mContext?.menu?.isLastPage == false
-        }
-
-        @JvmStatic
-        fun showAsciiPunch(): Boolean {
-            return mStatus?.isAsciiPunch == true || mStatus?.isAsciiMode == true
-        }
-
-        @JvmStatic
-        val composition: RimeComposition?
-            get() = mContext?.composition
-
-        @JvmStatic
-        val compositionText: String
-            get() = composition?.preedit ?: ""
+        fun showAsciiPunch(): Boolean = mStatus?.isAsciiPunch == true || mStatus?.isAsciiMode == true
 
         @JvmStatic
         val composingText: String
-            get() = mContext?.commitTextPreview ?: ""
-
-        @JvmStatic
-        val selectLabels: Array<String>
-            get() = mContext?.selectLabels ?: arrayOf()
+            get() = inputContext?.composition?.commitTextPreview ?: ""
 
         @JvmStatic
         fun isVoidKeycode(keycode: Int): Boolean {
@@ -194,15 +307,9 @@ class Rime(fullCheck: Boolean) {
             }
         }
 
-        private fun isValidText(text: CharSequence?): Boolean {
-            if (text.isNullOrEmpty()) return false
-            val ch = text.toString().codePointAt(0)
-            return ch in 0x20..0x7f
-        }
-
         @JvmStatic
         fun simulateKeySequence(sequence: CharSequence): Boolean {
-            if (!isValidText(sequence)) return false
+            if (!sequence.first().isAsciiPrintable()) return false
             Timber.d("simulateKeySequence: $sequence")
             return simulateRimeKeySequence(
                 sequence.toString().replace("{}", "{braceleft}{braceright}"),
@@ -213,74 +320,17 @@ class Rime(fullCheck: Boolean) {
         }
 
         @JvmStatic
-        val candidatesOrStatusSwitches: Array<CandidateListItem>
-            get() {
-                val showSwitches = AppPrefs.defaultInstance().keyboard.switchesEnabled
-                return if (!isComposing && showSwitches) {
-                    SchemaManager.getStatusSwitches()
-                } else {
-                    mContext?.candidates ?: arrayOf()
-                }
-            }
-
-        val candidatesWithoutSwitch: Array<CandidateListItem>
-            get() = if (isComposing) mContext?.candidates ?: arrayOf() else arrayOf()
-
-        @JvmStatic
-        val candHighlightIndex: Int
-            get() = if (isComposing) mContext?.menu?.highlightedCandidateIndex ?: -1 else -1
-
-        fun commitComposition(): Boolean {
-            return commitRimeComposition().also {
-                updateContext()
-            }
-        }
-
-        fun clearComposition() {
-            clearRimeComposition()
-            updateContext()
-        }
-
-        fun selectCandidate(index: Int): Boolean {
-            return selectRimeCandidateOnCurrentPage(index).also {
-                updateContext()
-            }
-        }
-
-        fun deleteCandidate(index: Int): Boolean {
-            return deleteRimeCandidateOnCurrentPage(index).also {
-                updateContext()
-            }
-        }
-
-        @JvmStatic
         fun setOption(
             option: String,
             value: Boolean,
         ) {
-            if (isHandlingRimeNotification) return
-            setRimeOption(option, value)
+            measureTimeMillis {
+                setRimeOption(option, value)
+            }.also { Timber.d("Took $it ms to set $option to $value") }
         }
 
         @JvmStatic
-        fun getOption(option: String): Boolean {
-            return getRimeOption(option)
-        }
-
-        fun toggleOption(option: String) {
-            setOption(option, !getOption(option))
-        }
-
-        @JvmStatic
-        val isEmpty: Boolean
-            get() = getCurrentRimeSchema() == ".default" // 無方案
-
-        fun selectSchema(schemaId: String): Boolean {
-            Timber.d("selectSchema: schemaId=$schemaId")
-            return selectRimeSchema(schemaId).also {
-                updateContext()
-            }
-        }
+        fun getOption(option: String): Boolean = getRimeOption(option)
 
         @JvmStatic
         fun setCaretPos(caretPos: Int) {
@@ -326,13 +376,13 @@ class Rime(fullCheck: Boolean) {
 
         // output
         @JvmStatic
-        external fun getRimeCommit(): RimeCommit?
+        external fun getRimeCommit(): RimeProto.Commit?
 
         @JvmStatic
-        external fun getRimeContext(): RimeContext?
+        external fun getRimeContext(): RimeProto.Context?
 
         @JvmStatic
-        external fun getRimeStatus(): RimeStatus?
+        external fun getRimeStatus(): RimeProto.Status?
 
         // runtime options
         @JvmStatic
@@ -345,7 +395,7 @@ class Rime(fullCheck: Boolean) {
         external fun getRimeOption(option: String): Boolean
 
         @JvmStatic
-        external fun getRimeSchemaList(): Array<SchemaListItem>
+        external fun getRimeSchemaList(): Array<SchemaItem>
 
         @JvmStatic
         external fun getCurrentRimeSchema(): String
@@ -385,6 +435,12 @@ class Rime(fullCheck: Boolean) {
         external fun deleteRimeCandidateOnCurrentPage(index: Int): Boolean
 
         @JvmStatic
+        external fun selectRimeCandidate(index: Int): Boolean
+
+        @JvmStatic
+        external fun forgetRimeCandidate(index: Int): Boolean
+
+        @JvmStatic
         external fun getLibrimeVersion(): String
 
         // module
@@ -411,10 +467,10 @@ class Rime(fullCheck: Boolean) {
         external fun getRimeKeycodeByName(name: String): Int
 
         @JvmStatic
-        external fun getAvailableRimeSchemaList(): Array<SchemaListItem>
+        external fun getAvailableRimeSchemaList(): Array<SchemaItem>
 
         @JvmStatic
-        external fun getSelectedRimeSchemaList(): Array<SchemaListItem>
+        external fun getSelectedRimeSchemaList(): Array<SchemaItem>
 
         @JvmStatic
         external fun selectRimeSchemas(schemaIds: Array<String>): Boolean
@@ -425,17 +481,46 @@ class Rime(fullCheck: Boolean) {
             state: Boolean,
         ): String?
 
+        @JvmStatic
+        external fun getRimeCandidates(
+            startIndex: Int,
+            limit: Int,
+        ): Array<CandidateItem>?
+
         /** call from rime_jni */
         @JvmStatic
         fun handleRimeNotification(
             messageType: String,
             messageValue: String,
         ) {
-            isHandlingRimeNotification = true
             val notification = RimeNotification.create(messageType, messageValue)
             Timber.d("Handling Rime notification: $notification")
+            notificationHandlers.forEach { it.invoke(notification) }
             notificationFlow_.tryEmit(notification)
-            isHandlingRimeNotification = false
+        }
+
+        private fun registerRimeNotificationHandler(handler: (RimeNotification<*>) -> Unit) {
+            if (notificationHandlers.contains(handler)) return
+            notificationHandlers.add(handler)
+        }
+
+        private fun unregisterRimeNotificationHandler(handler: (RimeNotification<*>) -> Unit) {
+            notificationHandlers.remove(handler)
+        }
+
+        fun requestRimeResponse() {
+            val response = RimeResponse(getRimeCommit(), getRimeContext(), getRimeStatus())
+            Timber.d("Got Rime response: $response")
+            responseFlow_.tryEmit(response)
+        }
+
+        private fun registerRimeResponseHandler(handler: (RimeResponse) -> Unit) {
+            if (responseHandlers.contains(handler)) return
+            responseHandlers.add(handler)
+        }
+
+        private fun unregisterRimeResponseHandler(handler: (RimeResponse) -> Unit) {
+            responseHandlers.remove(handler)
         }
     }
 }

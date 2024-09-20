@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime
 
 import android.app.Application
@@ -5,11 +9,14 @@ import android.content.Intent
 import android.os.Process
 import android.util.Log
 import androidx.preference.PreferenceManager
-import com.osfans.trime.data.AppPrefs
 import com.osfans.trime.data.db.ClipboardHelper
 import com.osfans.trime.data.db.CollectionHelper
 import com.osfans.trime.data.db.DraftHelper
+import com.osfans.trime.data.prefs.AppPrefs
 import com.osfans.trime.ui.main.LogActivity
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.plus
 import timber.log.Timber
 import kotlin.system.exitProcess
 
@@ -30,6 +37,8 @@ class TrimeApplication : Application() {
 
         private const val MAX_STACKTRACE_SIZE = 128000
     }
+
+    val coroutineScope = MainScope() + CoroutineName("TrimeApplication")
 
     override fun onCreate() {
         super.onCreate()
@@ -63,9 +72,8 @@ class TrimeApplication : Application() {
             if (BuildConfig.DEBUG) {
                 Timber.plant(
                     object : Timber.DebugTree() {
-                        override fun createStackElementTag(element: StackTraceElement): String {
-                            return "${super.createStackElementTag(element)}|${element.fileName}:${element.lineNumber}"
-                        }
+                        override fun createStackElementTag(element: StackTraceElement): String =
+                            "${super.createStackElementTag(element)}|${element.fileName}:${element.lineNumber}"
 
                         override fun log(
                             priority: Int,

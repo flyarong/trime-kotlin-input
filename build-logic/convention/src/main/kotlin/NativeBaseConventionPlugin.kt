@@ -1,16 +1,19 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import Versions.cmakeVersion
 import Versions.ndkVersion
 import com.android.build.api.dsl.CommonExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.tasks.Delete
-import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.task
 
 open class NativeBaseConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         target.pluginManager.apply("com.android.application")
-        target.extensions.configure<CommonExtension<*, *, *, *, *>>("android") {
+        target.extensions.configure(CommonExtension::class.java) {
             ndkVersion = target.ndkVersion
             // Use prebuilt JNI library if the "app/prebuilt" exists
             //
@@ -45,10 +48,11 @@ open class NativeBaseConventionPlugin : Plugin<Project> {
     }
 
     private fun registerCleanCxxTask(project: Project) {
-        project.task<Delete>("cleanCxxIntermediates") {
-            delete(project.file(".cxx"))
-        }.also {
-            project.cleanTask.dependsOn(it)
-        }
+        project
+            .task<Delete>("cleanCxxIntermediates") {
+                delete(project.file(".cxx"))
+            }.also {
+                project.cleanTask.dependsOn(it)
+            }
     }
 }

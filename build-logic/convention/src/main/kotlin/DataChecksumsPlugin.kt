@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import org.gradle.api.DefaultTask
@@ -34,14 +38,15 @@ class DataChecksumsPlugin : Plugin<Project> {
 
     override fun apply(target: Project) {
         target.task<DataChecksumsTask>(TASK) {
-            inputDir.set(target.assetsDir)
+            inputDir.set(target.assetsDir.resolve("shared"))
             outputFile.set(target.assetsDir.resolve(FILE_NAME))
         }
-        target.task<Delete>(CLEAN_TASK) {
-            delete(target.assetsDir.resolve(FILE_NAME))
-        }.also {
-            target.tasks.findByName("clean")?.dependsOn(it)
-        }
+        target
+            .task<Delete>(CLEAN_TASK) {
+                delete(target.assetsDir.resolve(FILE_NAME))
+            }.also {
+                target.tasks.findByName("clean")?.dependsOn(it)
+            }
     }
 
     abstract class DataChecksumsTask : DefaultTask() {
@@ -64,7 +69,8 @@ class DataChecksumsPlugin : Plugin<Project> {
         private fun serialize(files: Map<String, String>) {
             val checksums =
                 DataChecksums(
-                    Hashing.sha256()
+                    Hashing
+                        .sha256()
                         .hashString(
                             files.entries.joinToString { it.key + it.value },
                             Charset.defaultCharset(),
@@ -83,19 +89,19 @@ class DataChecksumsPlugin : Plugin<Project> {
         @TaskAction
         fun execute(inputChanges: InputChanges) {
             val map =
-                file.exists()
+                file
+                    .exists()
                     .takeIf { it }
                     ?.runCatching {
                         deserialize()
                             // remove all old dirs
                             .filterValues { it.isNotBlank() }
                             .toMutableMap()
-                    }
-                    ?.getOrNull()
+                    }?.getOrNull()
                     ?: mutableMapOf()
 
             fun File.allParents(): List<File> =
-                if (parentFile == null || parentFile.path in map) {
+                if (parentFile == null || parentFile.invariantSeparatorsPath in map) {
                     listOf()
                 } else {
                     listOf(parentFile) + parentFile.allParents()
@@ -106,7 +112,7 @@ class DataChecksumsPlugin : Plugin<Project> {
                 }
                 logger.log(LogLevel.DEBUG, "${change.changeType}: ${change.normalizedPath}")
                 val relativeFile = change.file.relativeTo(file.parentFile)
-                val key = relativeFile.path
+                val key = relativeFile.invariantSeparatorsPath
                 if (change.changeType == ChangeType.REMOVED) {
                     map.remove(key)
                 } else {
@@ -116,7 +122,7 @@ class DataChecksumsPlugin : Plugin<Project> {
             // calculate dirs
             inputDir.asFileTree.forEach {
                 it.relativeTo(file.parentFile).allParents().forEach { p ->
-                    map[p.path] = ""
+                    map[p.invariantSeparatorsPath] = ""
                 }
             }
             serialize(map.toSortedMap())

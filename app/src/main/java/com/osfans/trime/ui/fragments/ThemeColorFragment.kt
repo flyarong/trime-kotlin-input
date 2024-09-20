@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.ui.fragments
 
 import android.os.Bundle
@@ -8,8 +12,8 @@ import androidx.preference.get
 import com.osfans.trime.R
 import com.osfans.trime.ui.components.PaddingPreferenceFragment
 import com.osfans.trime.ui.main.MainViewModel
-import com.osfans.trime.ui.main.colorPicker
-import com.osfans.trime.ui.main.themePicker
+import com.osfans.trime.ui.main.settings.ColorPickerDialog
+import com.osfans.trime.ui.main.settings.ThemePickerDialog
 import kotlinx.coroutines.launch
 
 class ThemeColorFragment : PaddingPreferenceFragment() {
@@ -22,11 +26,11 @@ class ThemeColorFragment : PaddingPreferenceFragment() {
         addPreferencesFromResource(R.xml.theme_color_preference)
         with(preferenceScreen) {
             get<Preference>("theme_selected_theme")?.setOnPreferenceClickListener {
-                lifecycleScope.launch { context.themePicker().show() }
+                lifecycleScope.launch { ThemePickerDialog.build(lifecycleScope, context).show() }
                 true
             }
             get<Preference>("theme_selected_color")?.setOnPreferenceClickListener {
-                lifecycleScope.launch { context.colorPicker().show() }
+                lifecycleScope.launch { ColorPickerDialog.build(lifecycleScope, context).show() }
                 true
             }
         }

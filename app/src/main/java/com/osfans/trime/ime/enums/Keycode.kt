@@ -1,7 +1,11 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.ime.enums
 
 import android.view.KeyEvent
-import com.osfans.trime.ime.keyboard.Key
+import com.osfans.trime.util.virtualKeyCharacterMap
 import timber.log.Timber
 import java.util.EnumMap
 import kotlin.collections.HashMap
@@ -353,7 +357,7 @@ enum class Keycode {
         private val reverseMap: EnumMap<Keycode, String> = EnumMap(Keycode::class.java)
 
         init {
-            for (type in values()) {
+            for (type in entries) {
                 convertMap[type.toString()] = type
             }
 
@@ -427,16 +431,14 @@ enum class Keycode {
             reverseMap[KP_9] = "9"
         }
 
-        fun isStdKey(keycode: Int): Boolean {
-            return keycode in SOFT_LEFT.ordinal..PROFILE_SWITCH.ordinal
-        }
+        fun isStdKey(keycode: Int): Boolean = keycode in SOFT_LEFT.ordinal..PROFILE_SWITCH.ordinal
 
         fun toStdKeyEvent(
             keycode: Int,
             mask: Int = 0,
         ): IntArray {
             val event = IntArray(2)
-            if (keycode !in values().indices) return event
+            if (keycode !in entries.indices) return event
             if (keycode < A.ordinal) {
                 event[0] = keycode
                 event[1] = mask
@@ -470,13 +472,11 @@ enum class Keycode {
         }
 
         private fun hasSymbolLabel(keycode: Int): Boolean {
-            if (keycode !in values().indices) return false
-            return keycode >= A.ordinal || reverseMap.containsKey(values()[keycode])
+            if (keycode !in entries.indices) return false
+            return keycode >= A.ordinal || reverseMap.containsKey(entries[keycode])
         }
 
-        fun getSymbolLabel(keycode: Keycode): String {
-            return reverseMap[keycode] ?: ""
-        }
+        fun getSymbolLabel(keycode: Keycode): String = reverseMap[keycode] ?: ""
 
         fun getDisplayLabel(
             keyCode: Int,
@@ -484,14 +484,14 @@ enum class Keycode {
         ): String =
             if (isStdKey(keyCode)) {
                 // Android keycode区域
-                if (Key.getKcm().isPrintingKey(keyCode)) {
+                if (virtualKeyCharacterMap.isPrintingKey(keyCode)) {
                     val event = KeyEvent(0, 0, KeyEvent.ACTION_DOWN, keyCode, 0, mask)
                     val charCode = event.getUnicodeChar(mask)
                     Timber.d("getDisplayLabel(): keycode=$keyCode, mask=$mask, charCode=$charCode")
                     if (charCode > 0) {
                         charCode.toChar().toString()
                     } else {
-                        Key.getKcm().getDisplayLabel(keyCode).lowercase()
+                        virtualKeyCharacterMap.getDisplayLabel(keyCode).lowercase()
                     }
                 } else {
                     keyNameOf(keyCode)
@@ -512,21 +512,16 @@ enum class Keycode {
             )
 
         @JvmStatic
-        fun fromString(s: String): Keycode {
-            return convertMap[s] ?: VoidSymbol
-        }
+        fun fromString(s: String): Keycode = convertMap[s] ?: VoidSymbol
 
         @JvmStatic
-        fun valueOf(ordinal: Int): Keycode {
-            return runCatching {
-                values()[ordinal]
+        fun valueOf(ordinal: Int): Keycode =
+            runCatching {
+                entries[ordinal]
             }.getOrDefault(VoidSymbol)
-        }
 
         @JvmStatic
-        fun keyNameOf(ordinal: Int): String {
-            return valueOf(ordinal).toString().substringAfter('_')
-        }
+        fun keyNameOf(ordinal: Int): String = valueOf(ordinal).toString().substringAfter('_')
 
         @JvmStatic
         fun keyCodeOf(name: String): Int {

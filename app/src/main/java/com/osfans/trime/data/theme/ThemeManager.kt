@@ -1,47 +1,73 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.data.theme
 
-import com.osfans.trime.data.AppPrefs
-import com.osfans.trime.data.DataDirectoryChangeListener
-import com.osfans.trime.data.DataManager
+import androidx.annotation.Keep
+import com.osfans.trime.data.base.DataManager
+import com.osfans.trime.data.prefs.AppPrefs
+import com.osfans.trime.ime.symbol.TabManager
 import java.io.File
 
-object ThemeManager : DataDirectoryChangeListener.Listener {
-    init {
-        // register listener
-        DataDirectoryChangeListener.addDirectoryChangeListener(this)
+object ThemeManager {
+    fun interface OnThemeChangeListener {
+        fun onThemeChange(theme: Theme)
     }
-
-    private fun listThemes(path: File): MutableList<String> {
-        return path.listFiles { _, name -> name.endsWith("trime.yaml") }
-            ?.map { f -> f.nameWithoutExtension }
-            ?.toMutableList() ?: mutableListOf()
-    }
-
-    @JvmStatic
-    fun switchTheme(theme: String) {
-        AppPrefs.defaultInstance().themeAndColor.selectedTheme = theme
-    }
-
-    var sharedThemes: MutableList<String> = listThemes(DataManager.sharedDataDir)
-
-    var userThemes: MutableList<String> = listThemes(DataManager.userDataDir)
 
     /**
      * Update sharedThemes and userThemes.
      */
-    override fun onDataDirectoryChange() {
-        sharedThemes = listThemes(DataManager.sharedDataDir)
-        userThemes = listThemes(DataManager.userDataDir)
-    }
-
-    @JvmStatic
-    fun getAllThemes(): List<String> {
-        if (DataManager.sharedDataDir.absolutePath == DataManager.userDataDir.absolutePath) {
-            return userThemes
+    @Keep
+    private val onDataDirChange =
+        DataManager.OnDataDirChangeListener {
+            refreshThemes()
         }
-        return sharedThemes + userThemes
+
+    init {
+        // register listener
+        DataManager.addOnChangedListener(onDataDirChange)
     }
 
-    @JvmStatic
-    fun getActiveTheme() = AppPrefs.defaultInstance().themeAndColor.selectedTheme
+    private fun listThemes(path: File): MutableList<String> =
+        path
+            .listFiles { _, name -> name.endsWith("trime.yaml") }
+            ?.mapNotNull { f ->
+                if (f.name == "trime.yaml") "trime" else f.name.substringBeforeLast(".trime.yaml")
+            }?.toMutableList() ?: mutableListOf()
+
+    private val sharedThemes: MutableList<String> get() = listThemes(DataManager.sharedDataDir)
+
+    private val userThemes: MutableList<String> get() = listThemes(DataManager.userDataDir)
+
+    fun getAllThemes(): List<String> = sharedThemes + userThemes
+
+    private fun refreshThemes() {
+        sharedThemes.clear()
+        userThemes.clear()
+        sharedThemes.addAll(listThemes(DataManager.sharedDataDir))
+        userThemes.addAll(listThemes(DataManager.userDataDir))
+    }
+
+    // 在初始化 ColorManager 时会被赋值
+    lateinit var activeTheme: Theme
+        private set
+
+    private val prefs = AppPrefs.defaultInstance().theme
+
+    fun init() = setNormalTheme(prefs.selectedTheme)
+
+    fun setNormalTheme(name: String) {
+        Theme(name).let {
+            if (::activeTheme.isInitialized) {
+                if (it == activeTheme) return
+            }
+            activeTheme = it
+            // 由于这里的顺序不能打乱，不适合使用 listener
+            EventManager.refresh()
+            FontManager.refresh()
+            ColorManager.refresh()
+            TabManager.refresh()
+        }
+    }
 }

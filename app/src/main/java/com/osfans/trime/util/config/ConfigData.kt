@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.util.config
 
 import com.charleskorn.kaml.Yaml
@@ -14,15 +18,14 @@ import com.charleskorn.kaml.yamlScalar
 import timber.log.Timber
 import java.io.File
 
-fun convertFromYaml(node: YamlNode): ConfigItem? {
-    return when (node) {
+fun convertFromYaml(node: YamlNode): ConfigItem? =
+    when (node) {
         is YamlNull -> null
         is YamlScalar -> ConfigValue(node.yamlScalar)
         is YamlList -> ConfigList(node.yamlList)
         is YamlMap -> ConfigMap(node.yamlMap)
         else -> null
     }
-}
 
 /**
  * The wrapper of parsed YAML node.

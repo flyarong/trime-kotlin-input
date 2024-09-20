@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2015 - 2024 Rime community
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 [submodule "OpenCC"]
 	path = app/src/main/jni/OpenCC
 	url = https://github.com/BYVoid/OpenCC.git
@@ -28,3 +32,6 @@
 [submodule "app/src/main/jni/librime-predict"]
 	path = app/src/main/jni/librime-predict
 	url = https://github.com/rime/librime-predict
+[submodule "prelude"]
+	path = app/src/main/assets/prelude
+	url = https://github.com/rime/rime-prelude

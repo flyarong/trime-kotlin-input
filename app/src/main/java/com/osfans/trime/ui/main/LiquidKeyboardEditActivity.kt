@@ -1,25 +1,29 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.ui.main
 
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.view.Gravity
 import android.widget.EditText
-import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
 import com.osfans.trime.data.db.ClipboardHelper
 import com.osfans.trime.data.db.CollectionHelper
 import com.osfans.trime.data.db.DraftHelper
 import com.osfans.trime.databinding.ActivityLiquidKeyboardEditBinding
-import com.osfans.trime.ime.core.Trime
-import com.osfans.trime.ime.enums.SymbolKeyboardType
+import com.osfans.trime.ime.symbol.SymbolBoardType
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
-class LiquidKeyboardEditActivity : AppCompatActivity() {
-    private val service: Trime = Trime.getService()
+class LiquidKeyboardEditActivity : Activity() {
+    private val scope: CoroutineScope = MainScope()
     private var id: Int? = null
     private lateinit var editText: EditText
-    private var type: SymbolKeyboardType? = null
+    private var type: SymbolBoardType? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,7 +45,7 @@ class LiquidKeyboardEditActivity : AppCompatActivity() {
         // Extract necessary values.
         if (intent.extras != null) {
             val strType = intent.getStringExtra(LIQUID_KEYBOARD_TYPE)
-            type = SymbolKeyboardType.fromString(strType)
+            type = SymbolBoardType.fromString(strType)
             id = intent.getIntExtra(DB_BEAN_ID, -1)
             val text = intent.getStringExtra(DB_BEAN_TEXT)
             editText.setText(text)
@@ -56,20 +60,20 @@ class LiquidKeyboardEditActivity : AppCompatActivity() {
         if (id == null || id == -1) return
         val newText = editText.text.toString()
         when (type) {
-            SymbolKeyboardType.CLIPBOARD -> {
-                service.lifecycleScope.launch {
+            SymbolBoardType.CLIPBOARD -> {
+                scope.launch {
                     ClipboardHelper.updateText(id!!, newText)
                 }
             }
 
-            SymbolKeyboardType.COLLECTION -> {
-                service.lifecycleScope.launch {
+            SymbolBoardType.COLLECTION -> {
+                scope.launch {
                     CollectionHelper.updateText(id!!, newText)
                 }
             }
 
-            SymbolKeyboardType.DRAFT -> {
-                service.lifecycleScope.launch {
+            SymbolBoardType.DRAFT -> {
+                scope.launch {
                     DraftHelper.updateText(id!!, newText)
                 }
             }

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.util
 
 object CollectionUtils {
@@ -48,7 +52,13 @@ object CollectionUtils {
         if (map.isNullOrEmpty() || key.isEmpty()) return defValue
         val nm = obtainString(map, key)
         return runCatching {
-            if (nm.isNotEmpty()) java.lang.Long.decode(nm).toInt() else defValue
+            if (nm.isNotEmpty()) {
+                java.lang.Long
+                    .decode(nm)
+                    .toInt()
+            } else {
+                defValue
+            }
         }.getOrDefault(defValue)
     }
 

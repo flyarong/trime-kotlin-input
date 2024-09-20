@@ -1,26 +1,28 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.ime.symbol
 
-import android.annotation.SuppressLint
 import android.os.Build
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.PopupMenu
-import androidx.appcompat.app.AlertDialog
-import androidx.lifecycle.findViewTreeLifecycleOwner
-import androidx.lifecycle.lifecycleScope
+import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.recyclerview.widget.RecyclerView
 import com.osfans.trime.R
-import com.osfans.trime.data.db.CollectionHelper
 import com.osfans.trime.data.db.DatabaseBean
+import com.osfans.trime.data.theme.ColorManager
 import com.osfans.trime.data.theme.FontManager
 import com.osfans.trime.data.theme.Theme
 import com.osfans.trime.databinding.SimpleKeyItemBinding
-import com.osfans.trime.ime.core.Trime
-import com.osfans.trime.util.appContext
-import kotlinx.coroutines.launch
+import splitties.resources.drawable
+import splitties.resources.styledColor
+import kotlin.math.min
 
-class FlexibleAdapter(
+abstract class FlexibleAdapter(
     private val theme: Theme,
 ) : RecyclerView.Adapter<FlexibleAdapter.ViewHolder>() {
     private val mBeans = mutableListOf<DatabaseBean>()
@@ -29,10 +31,8 @@ class FlexibleAdapter(
     // 以应对增删条目时 id 和其位置的相对变化
     // [<id, position>, ...]
     private val mBeansId = mutableMapOf<Int, Int>()
-    val beans: List<DatabaseBean>
-        get() = mBeans
+    val beans get() = mBeans
 
-    @SuppressLint("NotifyDataSetChanged")
     fun updateBeans(beans: List<DatabaseBean>) {
         val sorted =
             beans.sortedWith { b1, b2 ->
@@ -45,27 +45,74 @@ class FlexibleAdapter(
                     else -> b2.id.compareTo(b1.id)
                 }
             }
+        val prevSize = mBeans.size
         mBeans.clear()
+        notifyItemRangeRemoved(0, prevSize)
         mBeans.addAll(sorted)
+        notifyItemRangeChanged(0, sorted.size)
         mBeansId.clear()
         mBeans.forEachIndexed { index: Int, (id): DatabaseBean ->
             mBeansId[id] = index
         }
-        // 更新视图
-        notifyDataSetChanged()
     }
 
+    private fun excerptText(
+        str: String,
+        lines: Int = 4,
+        chars: Int = 128,
+    ): String =
+        buildString {
+            val length = str.length
+            var lineBreak = -1
+            for (i in 1..lines) {
+                val start = lineBreak + 1 // skip previous '\n'
+                val excerptEnd = min(start + chars, length)
+                lineBreak = str.indexOf('\n', start)
+                if (lineBreak < 0) {
+                    // no line breaks remaining, substring to end of text
+                    append(str.substring(start, excerptEnd))
+                    break
+                } else {
+                    val end = min(excerptEnd, lineBreak)
+                    // append one line exactly
+                    appendLine(str.substring(start, end))
+                }
+            }
+        }
+
     override fun getItemCount(): Int = mBeans.size
+
+    private val mTypeface = FontManager.getTypeface("long_text_font")
+    private val mLongTextColor = ColorManager.getColor("long_text_color")
+    private val mKeyTextColor = ColorManager.getColor("key_text_color")
+    private val mKeyLongTextSize = theme.generalStyle.keyLongTextSize
+    private val mLabelTextSize = theme.generalStyle.labelTextSize
 
     override fun onCreateViewHolder(
         parent: ViewGroup,
         viewType: Int,
     ): ViewHolder {
         val binding = SimpleKeyItemBinding.inflate(LayoutInflater.from(parent.context))
+        binding.root.background =
+            ColorManager.getDrawable(
+                parent.context,
+                "long_text_back_color",
+                border = theme.generalStyle.keyBorder,
+                "key_long_text_border",
+                roundCorner = theme.generalStyle.roundCorner,
+            )
+        binding.simpleKey.apply {
+            typeface = mTypeface
+            (mLongTextColor ?: mKeyTextColor)?.let { setTextColor(it) }
+            (mKeyLongTextSize.takeIf { it > 0f } ?: mLabelTextSize.takeIf { it > 0f })
+                ?.let { textSize = it.toFloat() }
+        }
         return ViewHolder(binding)
     }
 
-    inner class ViewHolder(binding: SimpleKeyItemBinding) : RecyclerView.ViewHolder(binding.root) {
+    inner class ViewHolder(
+        binding: SimpleKeyItemBinding,
+    ) : RecyclerView.ViewHolder(binding.root) {
         val simpleKeyText = binding.simpleKey
         val simpleKeyPin = binding.simpleKeyPin
     }
@@ -76,113 +123,61 @@ class FlexibleAdapter(
     ) {
         with(viewHolder) {
             val bean = mBeans[position]
-            simpleKeyText.apply {
-                text = bean.text
-                typeface = FontManager.getTypeface(theme.style.getString("long_text_font"))
-                when (val textColor = theme.colors.getColor("long_text_color")) {
-                    null -> theme.colors.getColor("key_text_color")?.let { setTextColor(it) }
-                    else -> setTextColor(textColor)
-                }
-
-                val longTextSize = theme.style.getFloat("key_long_text_size")
-                val labelTextSize = theme.style.getFloat("label_text_size")
-                textSize =
-                    when {
-                        longTextSize > 0 -> longTextSize
-                        labelTextSize > 0 -> labelTextSize
-                        else -> textSize
-                    }
-            }
+            simpleKeyText.text = bean.text?.let { excerptText(it) }
             simpleKeyPin.visibility = if (bean.pinned) View.VISIBLE else View.INVISIBLE
+            itemView.setOnClickListener {
+                onPaste(bean)
+            }
+            itemView.setOnLongClickListener {
+                val iconColor = it.context.styledColor(android.R.attr.colorControlNormal)
+                val menu = PopupMenu(it.context, it)
 
-            // if (background != null) viewHolder.itemView.setBackground(background);
-            (itemView as ViewGroup).background =
-                theme.colors.getDrawable(
-                    "long_text_back_color",
-                    "key_border",
-                    "key_long_text_border",
-                    "round_corner",
-                    null,
-                )
-
-            // 如果设置了回调，则设置点击事件
-            if (this@FlexibleAdapter::listener.isInitialized) {
-                itemView.setOnClickListener {
-                    listener.onPaste(bean)
-                }
-                itemView.setOnLongClickListener {
-                    val menu = PopupMenu(it.context, it)
-                    val scope = it.findViewTreeLifecycleOwner()!!.lifecycleScope
-                    menu.menu.apply {
-                        add(R.string.edit).apply {
-                            setIcon(R.drawable.ic_baseline_edit_24)
-                            setOnMenuItemClickListener {
-                                scope.launch {
-                                    listener.onEdit(bean)
-                                }
-                                true
-                            }
-                        }
-                        if (bean.pinned) {
-                            add(R.string.simple_key_unpin).apply {
-                                setIcon(R.drawable.ic_outline_push_pin_24)
-                                setOnMenuItemClickListener {
-                                    scope.launch {
-                                        listener.onUnpin(bean)
-                                        setPinStatus(bean.id, false)
-                                    }
-                                    true
-                                }
-                            }
-                        } else {
-                            add(R.string.simple_key_pin).apply {
-                                setIcon(R.drawable.ic_baseline_push_pin_24)
-                                setOnMenuItemClickListener {
-                                    scope.launch {
-                                        listener.onPin(bean)
-                                        setPinStatus(bean.id, true)
-                                    }
-                                    true
-                                }
-                            }
-                        }
-                        if (listener.showCollectButton) {
-                            add(R.string.collect).apply {
-                                setIcon(R.drawable.ic_baseline_star_24)
-                                setOnMenuItemClickListener {
-                                    scope.launch { CollectionHelper.insert(DatabaseBean(text = bean.text)) }
-                                    true
-                                }
-                            }
-                        }
-                        add(R.string.delete).apply {
-                            setIcon(R.drawable.ic_baseline_delete_24)
-                            setOnMenuItemClickListener {
-                                scope.launch {
-                                    listener.onDelete(bean)
-                                    delete(bean.id)
-                                }
-                                true
-                            }
-                        }
-                        if (beans.isNotEmpty()) {
-                            add(R.string.delete_all).apply {
-                                setIcon(R.drawable.ic_baseline_delete_sweep_24)
-                                setOnMenuItemClickListener {
-                                    scope.launch {
-                                        askToDeleteAll()
-                                    }
-                                    true
-                                }
-                            }
+                fun menuItem(
+                    @StringRes title: Int,
+                    @DrawableRes ic: Int,
+                    callback: () -> Unit,
+                ) {
+                    menu.menu.add(title).apply {
+                        icon = it.context.drawable(ic)?.apply { setTint(iconColor) }
+                        setOnMenuItemClickListener {
+                            callback()
+                            true
                         }
                     }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        menu.setForceShowIcon(true)
-                    }
-                    menu.show()
-                    true
                 }
+                menuItem(R.string.edit, R.drawable.ic_baseline_edit_24) {
+                    onEdit(bean)
+                }
+                if (bean.pinned) {
+                    menuItem(R.string.simple_key_unpin, R.drawable.ic_outline_push_pin_24) {
+                        onUnpin(bean)
+                        setPinStatus(bean.id, false)
+                    }
+                } else {
+                    menuItem(R.string.simple_key_pin, R.drawable.ic_baseline_push_pin_24) {
+                        onPin(bean)
+                        setPinStatus(bean.id, true)
+                    }
+                }
+                if (showCollectButton) {
+                    menuItem(R.string.collect, R.drawable.ic_baseline_star_24) {
+                        onCollect(bean)
+                    }
+                }
+                menuItem(R.string.delete, R.drawable.ic_baseline_delete_24) {
+                    onDelete(bean)
+                    delete(bean.id)
+                }
+                if (beans.isNotEmpty()) {
+                    menuItem(R.string.delete_all, R.drawable.ic_baseline_delete_sweep_24) {
+                        onDeleteAll()
+                    }
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    menu.setForceShowIcon(true)
+                }
+                menu.show()
+                true
             }
         }
     }
@@ -207,42 +202,19 @@ class FlexibleAdapter(
         updateBeans(mBeans)
     }
 
-    private fun askToDeleteAll() {
-        val service = Trime.getService()
-        val askDialog =
-            AlertDialog.Builder(
-                appContext,
-                androidx.appcompat.R.style.Theme_AppCompat_DayNight_Dialog_Alert,
-            ).setTitle(R.string.liquid_keyboard_ask_to_delete_all)
-                .setPositiveButton(R.string.ok) { dialog, which ->
-                    service.lifecycleScope.launch {
-                        listener.onDeleteAll()
-                    }
-                }.setNegativeButton(R.string.cancel) { dialog, which ->
-                }.create()
-        service.showDialogAboveInputView(askDialog)
-    }
+    abstract fun onPaste(bean: DatabaseBean)
 
-    // 添加回调
-    interface Listener {
-        fun onPaste(bean: DatabaseBean)
+    abstract fun onPin(bean: DatabaseBean)
 
-        suspend fun onPin(bean: DatabaseBean)
+    abstract fun onUnpin(bean: DatabaseBean)
 
-        suspend fun onUnpin(bean: DatabaseBean)
+    abstract fun onEdit(bean: DatabaseBean)
 
-        suspend fun onDelete(bean: DatabaseBean)
+    abstract fun onCollect(bean: DatabaseBean)
 
-        suspend fun onEdit(bean: DatabaseBean)
+    abstract fun onDelete(bean: DatabaseBean)
 
-        suspend fun onDeleteAll()
+    abstract fun onDeleteAll()
 
-        val showCollectButton: Boolean
-    }
-
-    private lateinit var listener: Listener
-
-    fun setListener(listener: Listener) {
-        this.listener = listener
-    }
+    abstract val showCollectButton: Boolean
 }

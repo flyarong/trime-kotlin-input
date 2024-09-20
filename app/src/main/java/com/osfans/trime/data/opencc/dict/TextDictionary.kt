@@ -1,9 +1,15 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.data.opencc.dict
 
 import com.osfans.trime.data.opencc.OpenCCDictManager
 import java.io.File
 
-class TextDictionary(file: File) : Dictionary() {
+class TextDictionary(
+    file: File,
+) : Dictionary() {
     override var file: File = file
         private set
 

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.util
 
 import android.content.res.Resources
@@ -55,7 +59,8 @@ object NinePatchBitmapFactory {
         rangeListY: List<Range>?,
     ): ByteBuffer {
         val buffer =
-            ByteBuffer.allocate(4 + 4 * 7 + 4 * 2 * rangeListX!!.size + 4 * 2 * rangeListY!!.size + 4 * 9)
+            ByteBuffer
+                .allocate(4 + 4 * 7 + 4 * 2 * rangeListX!!.size + 4 * 2 * rangeListY!!.size + 4 * 9)
                 .order(
                     ByteOrder.nativeOrder(),
                 )

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.ui.components
 
 import android.content.Context
@@ -72,13 +76,12 @@ class DialogSeekBarPreference : Preference {
      * If [systemDefaultValueText] is not null this method tries to match the given [value] with
      * [systemDefaultValue] and returns [systemDefaultValueText] upon matching.
      */
-    private fun getTextForValue(value: Int): String {
-        return if (value == systemDefaultValue && systemDefaultValueText.isNotEmpty()) {
+    private fun getTextForValue(value: Int): String =
+        if (value == systemDefaultValue && systemDefaultValueText.isNotEmpty()) {
             systemDefaultValueText
         } else {
             "$value $unit"
         }
-    }
 
     /**
      * Shows the seek bar dialog.
@@ -107,7 +110,8 @@ class DialogSeekBarPreference : Preference {
                     },
                 )
             }
-            AlertDialog.Builder(this)
+            AlertDialog
+                .Builder(this)
                 .setTitle(this@DialogSeekBarPreference.title)
                 .setView(dialogView.root)
                 .setPositiveButton(android.R.string.ok) { _, _ ->
@@ -116,12 +120,10 @@ class DialogSeekBarPreference : Preference {
                         persistInt(actualValue)
                         notifyChanged()
                     }
-                }
-                .setNeutralButton(R.string.pref__default) { _, _ ->
+                }.setNeutralButton(R.string.pref__default) { _, _ ->
                     persistInt(defaultValue)
                     notifyChanged()
-                }
-                .setNegativeButton(android.R.string.cancel, null)
+                }.setNegativeButton(android.R.string.cancel, null)
                 .show()
         }
 
@@ -143,8 +145,6 @@ class DialogSeekBarPreference : Preference {
     private fun getValueForProgress(progress: Int) = (progress * step) + min
 
     object SimpleSummaryProvider : SummaryProvider<DialogSeekBarPreference> {
-        override fun provideSummary(preference: DialogSeekBarPreference): CharSequence {
-            return preference.getTextForValue(preference.currentValue)
-        }
+        override fun provideSummary(preference: DialogSeekBarPreference): CharSequence = preference.getTextForValue(preference.currentValue)
     }
 }

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.ui.fragments
 
 import android.app.AlertDialog
@@ -34,7 +38,8 @@ class ToolkitFragment : PaddingPreferenceFragment() {
                 setTitle(R.string.real_time_logs_clear)
                 isIconSpaceReserved = false
                 setOnPreferenceClickListener {
-                    AlertDialog.Builder(context)
+                    AlertDialog
+                        .Builder(context)
                         .setMessage(R.string.real_time_logs_confirm)
                         .setPositiveButton(R.string.ok) { _, _ ->
                             Logcat.default.clearLog()

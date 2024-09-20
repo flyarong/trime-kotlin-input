@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 import org.gradle.api.Project
 import java.io.File
 import java.util.Properties
@@ -7,7 +11,9 @@ object ApkRelease {
 
     private val Project.props: Properties
         get() =
-            rootProject.file(KEYSTORE_PROPERTIES).takeIf { it.exists() }
+            rootProject
+                .file(KEYSTORE_PROPERTIES)
+                .takeIf { it.exists() }
                 ?.let { Properties().apply { load(it.inputStream()) } }
                 ?: Properties()
 

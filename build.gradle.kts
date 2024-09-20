@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /**
  * The buildscript block is where you configure the repositories and
  * dependencies for Gradle itself--meaning, you should not include dependencies
@@ -18,15 +22,9 @@ plugins {
 }
 
 spotless {
-    java {
-        importOrder()
-        removeUnusedImports()
-        target("app/src/main/java/com/osfans/trime/**/*.java")
-        googleJavaFormat("1.18.1")
-    }
     kotlin {
-        target("**/*.kt")
-        ktlint("1.0.1")
+        target("**/*.kt", "**/*.kts")
+        ktlint("1.3.1")
         trimTrailingWhitespace()
         indentWithSpaces()
         endWithNewline()

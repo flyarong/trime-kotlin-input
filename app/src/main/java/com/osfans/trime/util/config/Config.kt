@@ -1,12 +1,18 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.util.config
 
-import com.osfans.trime.data.DataManager
+import com.osfans.trime.data.base.DataManager
 import timber.log.Timber
 
 /**
  * New YAML config parser intended to replace the old one.
  */
-class Config(private val data: ConfigData = ConfigData()) {
+class Config(
+    private val data: ConfigData = ConfigData(),
+) {
     companion object {
         fun create(fileName: String): Config? {
             val data = ConfigData()
@@ -46,7 +52,7 @@ class Config(private val data: ConfigData = ConfigData()) {
     ): Boolean {
         Timber.d("read: $path")
         val p = data.traverse(path)?.configValue
-        return p?.getBool() ?: defValue
+        return runCatching { p?.getBool() }.getOrNull() ?: defValue
     }
 
     fun getInt(
@@ -55,7 +61,7 @@ class Config(private val data: ConfigData = ConfigData()) {
     ): Int {
         Timber.d("read: $path")
         val p = data.traverse(path)?.configValue
-        return p?.getInt() ?: defValue
+        return runCatching { p?.getInt() }.getOrNull() ?: defValue
     }
 
     fun getFloat(
@@ -64,7 +70,7 @@ class Config(private val data: ConfigData = ConfigData()) {
     ): Float {
         Timber.d("read: $path")
         val p = data.traverse(path)?.configValue
-        return p?.getFloat() ?: defValue
+        return runCatching { p?.getFloat() }.getOrNull() ?: defValue
     }
 
     fun getString(
@@ -73,7 +79,7 @@ class Config(private val data: ConfigData = ConfigData()) {
     ): String {
         Timber.d("read: $path")
         val p = data.traverse(path)?.configValue
-        return p?.getString() ?: defValue
+        return runCatching { p?.getString() }.getOrNull() ?: defValue
     }
 
     fun getItem(path: String): ConfigItem? {

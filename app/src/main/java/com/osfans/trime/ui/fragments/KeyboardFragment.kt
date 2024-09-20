@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.ui.fragments
 
 import android.content.SharedPreferences
@@ -6,16 +10,12 @@ import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import com.osfans.trime.R
-import com.osfans.trime.core.Rime
-import com.osfans.trime.data.AppPrefs
-import com.osfans.trime.data.DataManager
-import com.osfans.trime.ime.core.Trime
+import com.osfans.trime.data.prefs.AppPrefs
+import com.osfans.trime.ime.core.TrimeInputMethodService
 import com.osfans.trime.ui.components.PaddingPreferenceFragment
 import com.osfans.trime.ui.main.MainViewModel
-import com.osfans.trime.ui.main.soundPicker
-import kotlinx.coroutines.Dispatchers
+import com.osfans.trime.ui.main.settings.KeySoundEffectPickerDialog
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class KeyboardFragment :
     PaddingPreferenceFragment(),
@@ -29,7 +29,7 @@ class KeyboardFragment :
         addPreferencesFromResource(R.xml.keyboard_preference)
         findPreference<Preference>("keyboard__key_sound_package")
             ?.setOnPreferenceClickListener {
-                lifecycleScope.launch { requireContext().soundPicker().show() }
+                lifecycleScope.launch { KeySoundEffectPickerDialog.build(lifecycleScope, requireContext()).show() }
                 true
             }
     }
@@ -38,32 +38,15 @@ class KeyboardFragment :
         sharedPreferences: SharedPreferences?,
         key: String?,
     ) {
-        val trime = Trime.getServiceOrNull()
         when (key) {
             "keyboard__key_long_press_timeout",
             "keyboard__key_repeat_interval",
             "keyboard__show_key_popup",
+            AppPrefs.Keyboard.LANDSCAPE_MODE, AppPrefs.Keyboard.SPLIT_SPACE_PERCENT,
+            "keyboard__show_window",
+            "keyboard__inline_preedit", "keyboard__soft_cursor",
             -> {
-                trime?.resetKeyboard()
-            }
-            "keyboard__show_window" -> {
-                trime?.resetCandidate()
-            }
-            "keyboard__inline_preedit", "keyboard__soft_cursor" -> {
-                trime?.loadConfig()
-            }
-            "keyboard__candidate_page_size" -> {
-                val pageSize = AppPrefs.defaultInstance().keyboard.candidatePageSize.toInt()
-                if (pageSize <= 0) return
-                lifecycleScope.launch {
-                    withContext(Dispatchers.IO) {
-                        Rime.setRimeCustomConfigInt(
-                            "default",
-                            arrayOf("menu/page_size" to pageSize),
-                        )
-                        Rime.deployRimeConfigFile("${DataManager.userDataDir}/default.yaml", "")
-                    }
-                }
+                TrimeInputMethodService.getServiceOrNull()?.recreateInputView()
             }
         }
     }

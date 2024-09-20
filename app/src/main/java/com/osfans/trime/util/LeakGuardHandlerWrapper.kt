@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.util
 
 import android.os.Handler
@@ -25,12 +29,8 @@ open class LeakGuardHandlerWrapper<T>(
     constructor(ownerInstance: T) : this(ownerInstance, Looper.myLooper())
 
     @Synchronized
-    fun getOwnerInstance(): T {
-        return ownerInstanceRef.get()!!
-    }
+    fun getOwnerInstance(): T = ownerInstanceRef.get()!!
 
     @Synchronized
-    fun getOwnerInstanceOrNull(): T? {
-        return ownerInstanceRef.get()
-    }
+    fun getOwnerInstanceOrNull(): T? = ownerInstanceRef.get()
 }

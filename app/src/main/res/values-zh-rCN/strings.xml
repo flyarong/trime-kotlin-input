@@ -1,23 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+
 <!--
-/**
- * Copyright (C) 2015-present, osfans
- * waxaca@163.com https://github.com/osfans
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+SPDX-FileCopyrightText: 2015 - 2024 Rime community
+
+SPDX-License-Identifier: GPL-3.0-or-later
 -->
+
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <!-- 输入法平台名称  -->
     <string name="app_name_release">同文输入法</string>
@@ -29,7 +17,6 @@
     <string name="pref_trime_qq2">同文QQ群 2</string>
     <string name="pref_rime_qq">中州韵QQ群</string>
     <string name="pref_market">谷歌市场</string>
-    <string name="pref_coolmarket">酷安市场</string>
     <string name="about__donation_title">捐赠</string>
     <string name="about__donation_summary">使用支付宝捐助同文和PRIME的开发</string>
     <string name="settings__about_title">关于</string>
@@ -47,7 +34,6 @@
     <string name="pref_select_summary">选取同文输入法</string>
     <string name="looks__selected_theme_title">主题</string>
     <string name="looks__selected_theme_summary">选取主题</string>
-    <string name="pref_select_schemas">选择方案</string>
     <string name="looks__selected_color_title">配色</string>
     <string name="looks__selected_color_summary">选取键盘配色</string>
     <string name="keyboard__key_sound_title">按键声音</string>
@@ -72,6 +58,12 @@
         <item>输入码</item>
         <item>无</item>
     </string-array>
+    <string-array name="keyboard__landscape_mode_entries">
+        <item>永不</item>
+        <item>只在横屏时</item>
+        <item>在屏幕较宽或横屏时</item>
+        <item>永远都是</item>
+    </string-array>
     <string-array name="other__ui_mode_entries" >
         <item name="auto">系统默认</item>
         <item name="light">亮色</item>
@@ -88,7 +80,6 @@
     <string name="themes_progress">正在应用主题…</string>
     <string name="schemas_progress">正在加载方案…</string>
     <string name="set_ime">设置</string>
-    <string name="no_schemas">请在用户文件夹中放入default.yaml、输入法方案！</string>
     <string name="other_ime">其他输入法</string>
     <string name="other__ui_mode_title">夜间模式</string>
     <string name="pref_other">其他设置</string>
@@ -147,7 +138,7 @@
     <string name="external_storage_permission_granted">已授予存储权限</string>
     <string name="external_storage_permission_denied">已拒绝授权存储权限，部署或读取方案和配置功能或不可用</string>
     <string name="alert_window_access_required">同文输入法需要允许显示在其他应用上方以能显示应用外悬浮窗或对话框，点击“确定”以授权。</string>
-    <string name="keyboard__key_sound_package_title">按键音效包</string>
+    <string name="keyboard__key_sound_effect_title">按键音效</string>
     <string name="sound_progress">正在应用音效...</string>
     <string name="clipboard_draft_limit">草稿箱历史记录上限</string>
     <string name="clipboard_draft_output_title">草稿箱过滤规则</string>
@@ -184,36 +175,13 @@
     <string name="keyboard__key_swipe_velocity_hi">连续击键时触发滑动手势的速度</string>
     <string name="about__build_info">构建信息</string>
     <string name="keyboard__use_mini_keyboard_title">连接实体键盘时，显示迷你软键盘</string>
-    <string name="pref_trime_custom_qq">修改版QQ群</string>
+    <string name="pref_trime_telegram">Telegram群组</string>
     <string name="pref_keyboard__candidate">候选栏</string>
-    <string name="keyboard__candidate_page_size">每页显示候选词数量</string>
     <string name="copy_done">已复制</string>
     <string name="delete_done">已删除</string>
     <string name="keyboard__hook_shift_space">点击空格时，忽略Shift的锁定状态</string>
     <string name="keyboard__hook_shift_num">点击0-9时，忽略Shift的锁定状态</string>
     <string name="keyboard__hook_shift_symbol">点击符号键时，忽略Shift的锁定状态</string>
-    <string-array name="keyboard__candidate_page_size_entries" >
-        <item name="10000">不超出候选栏</item>
-        <item name="10001">接近于候选栏</item>
-        <item name="10002">略多于候选栏</item>
-        <item name="10005">1.5倍候选栏宽度</item>
-        <item name="10010">2倍候选栏宽度</item>
-        <item name="10020">3倍候选栏宽度</item>
-        <item name="0">由方案指定(需删除build目录中的方案并重新部署)</item>
-        <item name="5">5</item>
-        <item name="6">6</item>
-        <item name="7">7</item>
-        <item name="8">8</item>
-        <item name="9">9</item>
-        <item name="10">10</item>
-        <item name="11">11</item>
-        <item name="12">12</item>
-        <item name="15">15</item>
-        <item name="20">20</item>
-        <item name="30">30</item>
-        <item name="50">50</item>
-        <item name="100">100</item>
-    </string-array>
     <string name="pref_toolkit">工具箱</string>
     <string name="system">系统</string>
     <string name="export">导出</string>
@@ -241,7 +209,6 @@
     <string name="pref_profile_summary">设定存储位置和修改同步设置等</string>
     <string name="profile_reset_summary">用默认的内置配置覆盖共享目录中的相同文件</string>
     <string name="profile_sync_user_data_summary">备份配置文件和同步用户词典</string>
-    <string name="pref_select_schemas_summary">启用或禁用方案并部署</string>
     <string name="other_managed_clipboard">剪贴板内容</string>
     <string name="other_managed_draft">管理草稿箱内容</string>
     <string name="other_managed_collection">管理收藏夹内容</string>
@@ -267,4 +234,37 @@
     <string name="pref_clipboard_summary">收藏夹和草稿箱也在这里管理</string>
     <string name="a_regular_expression_per_line">一行一条正则表达式</string>
     <string name="keyboard__custom_key_sound">使用自定义按键音</string>
+
+    <string name="pref_keyboard__landscape">横屏模式</string>
+    <string name="keyboard__landscape_mode_title">启用横屏模式</string>
+    <string name="keyboard__split_space_title">自动分割键盘比例</string>
+    <string name="setup__step_three">第 3 步</string>
+    <string name="setup__request_permmision_hint">当前同文需要存储权限以访问配置、使得用户容易更改。</string>
+    <string name="setup__request_permmision">请求存储权限</string>
+    <string name="grant_permission">授予权限</string>
+    <string name="schedule_exact_alarm_permission_title">没有闹钟和提醒权限</string>
+    <string name="schedule_exact_alarm_permission_message">没有闹钟和提醒权限，我们无法在启用定时同步时及时为您同步数据配置。</string>
+    <string name="notification_permission_title">没有通知权限</string>
+    <string name="notification_permission_message">没有发送通知的权限，我们无法在一些耗时操作完成时通知您。</string>
+    <string name="rime_daemon">Rime 守护程序</string>
+    <string name="restarting_rime">正在重新启动 Rime</string>
+    <string name="select_current_schema">选择当前方案</string>
+    <string name="enable_schemata">启用方案</string>
+    <string name="no_schema_to_select">当前没有方案可选择。请前往启用方案。</string>
+    <string name="no_schema_to_enable">没有方案可启用。请确保您已在用户文件夹中放入了前置文件和方案文件。</string>
+    <string name="schemata">方案</string>
+    <string name="schemata_hint">选择当前方案或启用更多方案</string>
+    <string name="navbar_background">导航栏背景</string>
+    <string name="no_theme_to_select">当前没有主题可选择。</string>
+    <string name="no_color_to_select">当前没有配色方案可选择。</string>
+    <string name="no_effect_to_select">当前没有按键音效可选择。</string>
+    <string-array name="navbar_bkg_labels">
+        <item>无背景</item>
+        <item>跟随键盘背景色</item>
+        <item>键盘背景图片</item>
+    </string-array>
+    <string name="theme_trime">默认</string>
+    <string name="theme_tongwenfeng">同文风</string>
+    <string name="setup_channel">设置向导</string>
+    <string name="forget_this_word">忘记该词</string>
 </resources>

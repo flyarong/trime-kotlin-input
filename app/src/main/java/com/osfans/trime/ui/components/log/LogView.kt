@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.ui.components.log
 
 import android.content.Context
@@ -26,8 +30,10 @@ import splitties.resources.styledColor
  */
 class LogView
     @JvmOverloads
-    constructor(context: Context, attributeSet: AttributeSet? = null) :
-    HorizontalScrollView(context, attributeSet) {
+    constructor(
+        context: Context,
+        attributeSet: AttributeSet? = null,
+    ) : HorizontalScrollView(context, attributeSet) {
         private var logcat: Logcat? = null
 
         private val logAdapter = LogAdapter()
@@ -73,9 +79,10 @@ class LogView
         fun setLogcat(logcat: Logcat) {
             this.logcat = logcat
             logcat.initLogFlow()
-            logcat.logFlow.onEach {
-                dyeAndAppendString(it)
-            }.launchIn(findViewTreeLifecycleOwner()!!.lifecycleScope)
+            logcat.logFlow
+                .onEach {
+                    dyeAndAppendString(it)
+                }.launchIn(findViewTreeLifecycleOwner()!!.lifecycleScope)
         }
 
         private fun dyeAndAppendString(str: String) {

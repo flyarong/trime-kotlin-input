@@ -1,7 +1,11 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.data.opencc
 
-import com.osfans.trime.data.DataDirectoryChangeListener
-import com.osfans.trime.data.DataManager
+import androidx.annotation.Keep
+import com.osfans.trime.data.base.DataManager
 import com.osfans.trime.data.opencc.dict.Dictionary
 import com.osfans.trime.data.opencc.dict.OpenCCDictionary
 import com.osfans.trime.data.opencc.dict.TextDictionary
@@ -11,23 +15,24 @@ import java.io.File
 import java.io.InputStream
 import kotlin.system.measureTimeMillis
 
-object OpenCCDictManager : DataDirectoryChangeListener.Listener {
-    init {
-        System.loadLibrary("rime_jni")
-        // register listener
-        DataDirectoryChangeListener.addDirectoryChangeListener(this)
-    }
-
-    var sharedDir = File(DataManager.sharedDataDir, "opencc").also { it.mkdirs() }
-    var userDir = File(DataManager.userDataDir, "opencc").also { it.mkdirs() }
-
+object OpenCCDictManager {
     /**
      * Update sharedDir and userDir.
      */
-    override fun onDataDirectoryChange() {
-        sharedDir = File(DataManager.sharedDataDir, "opencc").also { it.mkdirs() }
-        userDir = File(DataManager.userDataDir, "opencc").also { it.mkdirs() }
+    @Keep
+    private val onDataDirChange =
+        DataManager.OnDataDirChangeListener {
+            userDir = File(DataManager.userDataDir, "opencc").also { it.mkdirs() }
+        }
+
+    init {
+        System.loadLibrary("rime_jni")
+        // register listener
+        DataManager.addOnChangedListener(onDataDirChange)
     }
+
+    private val sharedDir = File(DataManager.sharedDataDir, "opencc").also { it.mkdirs() }
+    private var userDir = File(DataManager.userDataDir, "opencc").also { it.mkdirs() }
 
     fun sharedDictionaries(): List<Dictionary> =
         sharedDir
@@ -39,14 +44,7 @@ object OpenCCDictManager : DataDirectoryChangeListener.Listener {
             .listFiles()
             ?.mapNotNull { Dictionary.new(it) } ?: listOf()
 
-    fun getAllDictionaries(): List<Dictionary> =
-        if (sharedDir.path == userDir.path) {
-            userDictionaries()
-        } else {
-            (sharedDictionaries() + userDictionaries())
-        }
-
-    fun openCCDictionaries(): List<OpenCCDictionary> = getAllDictionaries().mapNotNull { it as? OpenCCDictionary }
+    fun getAllDictionaries(): List<Dictionary> = sharedDictionaries() + userDictionaries()
 
     fun importFromFile(file: File): OpenCCDictionary {
         val raw =
@@ -58,7 +56,7 @@ object OpenCCDictManager : DataDirectoryChangeListener.Listener {
             raw.toOpenCCDictionary(
                 File(
                     userDir,
-                    file.nameWithoutExtension + ".${Dictionary.Type.OPENCC.ext}",
+                    file.nameWithoutExtension + ".${Dictionary.Type.OCD2.ext}",
                 ),
             )
         Timber.d("Converted $raw to $new")
@@ -72,10 +70,17 @@ object OpenCCDictManager : DataDirectoryChangeListener.Listener {
     fun buildOpenCCDict() {
         for (d in getAllDictionaries()) {
             if (d is TextDictionary) {
-                val result: OpenCCDictionary
+                val result: Result<OpenCCDictionary>
                 measureTimeMillis {
-                    result = d.toOpenCCDictionary()
-                }.also { Timber.d("Took $it to convert to $result") }
+                    result = runCatching { d.toOpenCCDictionary() }
+                }.also {
+                    result
+                        .onSuccess { r ->
+                            Timber.d("Took $it to convert to $r")
+                        }.onFailure {
+                            Timber.e(it, "Failed to convert $d")
+                        }
+                }
             }
         }
     }
@@ -125,6 +130,6 @@ object OpenCCDictManager : DataDirectoryChangeListener.Listener {
     @JvmStatic
     external fun getOpenCCVersion(): String
 
-    const val MODE_BIN_TO_TXT = true // OCD2 to TXT
+    const val MODE_BIN_TO_TXT = true // OCD(2) to TXT
     const val MODE_TXT_TO_BIN = false // TXT to OCD2
 }

@@ -1,13 +1,16 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.data.schema
 
 import com.osfans.trime.util.config.Config
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.builtins.MapSerializer
-import kotlinx.serialization.builtins.serializer
 
-class Schema(schemaId: String = ".default") {
+class Schema(
+    schemaId: String = ".default",
+) {
     private val config =
         if (schemaId == ".default") {
             Config.create("default")
@@ -17,11 +20,9 @@ class Schema(schemaId: String = ".default") {
 
     val switches get() =
         config?.getList("switches")
-            ?.decode(ListSerializer(Switch.serializer()))
 
     val symbols get() =
         config?.getMap("punctuator/symbols")
-            ?.decode(MapSerializer(String.serializer(), ListSerializer(String.serializer())))
 
     val alphabet get() = config?.getString("speller/alphabet")
 

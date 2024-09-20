@@ -1,9 +1,12 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.ui.fragments
 
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.app.TimePickerDialog
-import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Build.VERSION
@@ -17,24 +20,25 @@ import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import androidx.preference.SwitchPreferenceCompat
 import androidx.preference.get
-import com.blankj.utilcode.util.ResourceUtils
-import com.blankj.utilcode.util.ToastUtils
-import com.blankj.utilcode.util.UriUtils
 import com.osfans.trime.R
 import com.osfans.trime.core.Rime
-import com.osfans.trime.data.AppPrefs
-import com.osfans.trime.data.DataManager
-import com.osfans.trime.ime.core.RimeWrapper
+import com.osfans.trime.daemon.RimeDaemon
+import com.osfans.trime.data.base.DataManager
+import com.osfans.trime.data.prefs.AppPrefs
 import com.osfans.trime.ui.components.FolderPickerPreference
 import com.osfans.trime.ui.components.PaddingPreferenceFragment
 import com.osfans.trime.ui.main.MainViewModel
+import com.osfans.trime.util.ResourceUtils
 import com.osfans.trime.util.appContext
 import com.osfans.trime.util.formatDateTime
+import com.osfans.trime.util.getFileFromUri
 import com.osfans.trime.util.rimeActionWithResultDialog
+import com.osfans.trime.util.toast
 import com.osfans.trime.util.withLoadingDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import splitties.systemservices.alarmManager
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
@@ -53,7 +57,7 @@ class ProfileFragment :
                         it,
                         DocumentsContract.getTreeDocumentId(it),
                     )
-                dialogView.editText.setText(UriUtils.uri2File(uri).absolutePath)
+                dialogView.editText.setText(context.getFileFromUri(uri)?.absolutePath)
             }
     }
 
@@ -63,10 +67,6 @@ class ProfileFragment :
     ) {
         addPreferencesFromResource(R.xml.profile_preference)
         with(preferenceScreen) {
-            get<FolderPickerPreference>("profile_shared_data_dir")?.apply {
-                setDefaultValue(DataManager.defaultDataDirectory.path)
-                registerDocumentTreeLauncher()
-            }
             get<FolderPickerPreference>("profile_user_data_dir")?.apply {
                 setDefaultValue(DataManager.defaultDataDirectory.path)
                 registerDocumentTreeLauncher()
@@ -75,7 +75,8 @@ class ProfileFragment :
                 lifecycleScope.launch {
                     this@ProfileFragment.context?.rimeActionWithResultDialog("rime.trime", "W", 1) {
                         Rime.syncRimeUserData()
-                        RimeWrapper.deploy()
+                        RimeDaemon.restartRime(true)
+                        true
                     }
                 }
                 true
@@ -100,7 +101,8 @@ class ProfileFragment :
                     }
                 summaryOff = context.getString(R.string.profile_enable_syncing_in_background)
             }
-            get<SwitchPreferenceCompat>("profile_timing_sync")?.apply { // 定时同步偏好描述
+            get<SwitchPreferenceCompat>("profile_timing_sync")?.apply {
+                // 定时同步偏好描述
                 val timingSyncPreference: SwitchPreferenceCompat? = findPreference("profile_timing_sync")
                 timingSyncPreference?.summaryProvider =
                     Preference.SummaryProvider<SwitchPreferenceCompat> {
@@ -114,9 +116,8 @@ class ProfileFragment :
                         }
                     }
             }
-            get<SwitchPreferenceCompat>("profile_timing_sync")?.setOnPreferenceClickListener { // 监听定时同步偏好设置
-                val alarmManager =
-                    context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            get<SwitchPreferenceCompat>("profile_timing_sync")?.setOnPreferenceClickListener {
+                // 监听定时同步偏好设置
                 // 设置待发送的同步事件
                 val pendingIntent =
                     PendingIntent.getBroadcast(
@@ -138,34 +139,38 @@ class ProfileFragment :
                             val triggerTime = cal.timeInMillis // 设置的时间
                             if (triggerTime > System.currentTimeMillis() + 1200000L) { // 设置的时间小于当前时间20分钟时将同步推迟到明天
                                 prefs.profile.timingSyncTriggerTime = triggerTime // 更新定时同步偏好值
-                                if (VERSION.SDK_INT >= VERSION_CODES.M) { // 根据SDK设置alarm任务
-                                    alarmManager.setExactAndAllowWhileIdle(
-                                        AlarmManager.RTC_WAKEUP,
-                                        triggerTime,
-                                        pendingIntent,
-                                    )
-                                } else {
-                                    alarmManager.setExact(
-                                        AlarmManager.RTC_WAKEUP,
-                                        triggerTime,
-                                        pendingIntent,
-                                    )
+                                if (VERSION.SDK_INT < VERSION_CODES.S || alarmManager.canScheduleExactAlarms()) {
+                                    if (VERSION.SDK_INT >= VERSION_CODES.M) { // 根据 API Level 设置 alarm 任务
+                                        alarmManager.setExactAndAllowWhileIdle(
+                                            AlarmManager.RTC_WAKEUP,
+                                            triggerTime,
+                                            pendingIntent,
+                                        )
+                                    } else {
+                                        alarmManager.setExact(
+                                            AlarmManager.RTC_WAKEUP,
+                                            triggerTime,
+                                            pendingIntent,
+                                        )
+                                    }
                                 }
                             } else {
                                 prefs.profile.timingSyncTriggerTime =
                                     triggerTime + TimeUnit.DAYS.toMillis(1)
-                                if (VERSION.SDK_INT >= VERSION_CODES.M) {
-                                    alarmManager.setExactAndAllowWhileIdle(
-                                        AlarmManager.RTC_WAKEUP,
-                                        triggerTime + TimeUnit.DAYS.toMillis(1),
-                                        pendingIntent,
-                                    )
-                                } else {
-                                    alarmManager.setExact(
-                                        AlarmManager.RTC_WAKEUP,
-                                        triggerTime + TimeUnit.DAYS.toMillis(1),
-                                        pendingIntent,
-                                    )
+                                if (VERSION.SDK_INT < VERSION_CODES.S || alarmManager.canScheduleExactAlarms()) {
+                                    if (VERSION.SDK_INT >= VERSION_CODES.M) {
+                                        alarmManager.setExactAndAllowWhileIdle(
+                                            AlarmManager.RTC_WAKEUP,
+                                            triggerTime + TimeUnit.DAYS.toMillis(1),
+                                            pendingIntent,
+                                        )
+                                    } else {
+                                        alarmManager.setExact(
+                                            AlarmManager.RTC_WAKEUP,
+                                            triggerTime + TimeUnit.DAYS.toMillis(1),
+                                            pendingIntent,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -178,7 +183,8 @@ class ProfileFragment :
                             cal.get(Calendar.MINUTE),
                             true,
                         )
-                    tpDialog.setOnCancelListener { // 当取消时间选择器时重置偏好
+                    tpDialog.setOnCancelListener {
+                        // 当取消时间选择器时重置偏好
                         get<SwitchPreferenceCompat>("profile_timing_sync")?.isChecked = false
                     }
                     tpDialog.show()
@@ -188,35 +194,31 @@ class ProfileFragment :
                 true
             }
             get<Preference>("profile_reset")?.setOnPreferenceClickListener {
-                val items = appContext.assets.list("rime")!!
+                val base = "shared"
+                val items = appContext.assets.list(base)!!
                 val checkedItems = items.map { false }.toBooleanArray()
-                AlertDialog.Builder(context)
+                AlertDialog
+                    .Builder(context)
                     .setTitle(R.string.profile_reset)
                     .setMultiChoiceItems(items, checkedItems) { _, id, isChecked ->
                         checkedItems[id] = isChecked
-                    }
-                    .setNegativeButton(android.R.string.cancel, null)
+                    }.setNegativeButton(android.R.string.cancel, null)
                     .setPositiveButton(android.R.string.ok) { _, _ ->
                         var res = true
                         lifecycleScope.withLoadingDialog(context) {
                             withContext(Dispatchers.IO) {
-                                for ((i, a) in items.withIndex()) {
-                                    if (checkedItems[i]) {
-                                        res = res and (
-                                            runCatching {
-                                                ResourceUtils.copyFileFromAssets(
-                                                    "rime/$a",
-                                                    "${DataManager.sharedDataDir.absolutePath}/$a",
-                                                )
-                                            }.getOrNull() ?: false
-                                        )
-                                    }
-                                }
+                                res =
+                                    items
+                                        .filterIndexed { index, _ -> checkedItems[index] }
+                                        .fold(true) { acc, asset ->
+                                            val destPath = DataManager.sharedDataDir.resolve(asset).absolutePath
+                                            ResourceUtils
+                                                .copyFile("$base/$asset", destPath)
+                                                .fold({ acc and true }, { acc and false })
+                                        }
                             }
+                            context.toast((if (res) R.string.reset_success else R.string.reset_failure))
                         }
-                        ToastUtils.showShort(
-                            if (res) R.string.reset_success else R.string.reset_failure,
-                        )
                     }.show()
                 true
             }

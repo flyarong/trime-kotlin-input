@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2015 - 2024 Rime community
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 # if you want to add some new plugins, add them to librime_jni/rime_jni.cc too
 set(RIME_PLUGINS librime-lua librime-charcode librime-octagram librime-predict)
 
@@ -24,9 +28,8 @@ option(BUILD_STATIC "" ON)
 add_subdirectory(librime)
 target_compile_options(rime-static PRIVATE "-ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.")
 
-target_link_libraries(rime-charcode-objs Boost::asio Boost::locale)
+target_link_libraries(rime-charcode-objs Boost::locale)
 
-target_link_libraries(rime-lua-objs Boost::optional)
 target_compile_options(rime-lua-objs PRIVATE "-ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.")
 
 target_compile_options(rime-octagram-objs PRIVATE "-ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.")

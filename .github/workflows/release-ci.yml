@@ -1,14 +1,18 @@
+# SPDX-FileCopyrightText: 2015 - 2024 Rime community
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 name: Release
 on:
   workflow_dispatch:
   push:
     tags:
-      - '^v*'
+      - 'v*'
 env:
   CI_NAME: Release CI
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -17,10 +21,10 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: "temurin"
-          java-version: 21
+          java-version: 17
           # will restore cache of dependencies and wrappers
           cache: 'gradle'
 
@@ -30,7 +34,7 @@ jobs:
             ./gradlew :app:calculateNativeCacheHash
 
       - name: Fetch JNI cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: jni-cache
         with:
           path: "app/prebuilt"
@@ -54,7 +58,7 @@ jobs:
 
       - name: Add JNI cache
         if: ${{ !steps.jni-cache.outputs.cache-hit }}
-        run: cp -R app/build/intermediates/stripped_native_libs/release/out/lib app/prebuilt
+        run: cp -R app/build/intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib app/prebuilt
 
       - name: Build changelog
         id: build_changelog

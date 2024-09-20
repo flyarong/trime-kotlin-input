@@ -1,13 +1,19 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.ui.main
 
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.lifecycleScope
@@ -17,7 +23,6 @@ import com.osfans.trime.databinding.ActivityLogBinding
 import com.osfans.trime.ui.components.log.LogView
 import com.osfans.trime.util.DeviceInfo
 import com.osfans.trime.util.Logcat
-import com.osfans.trime.util.applyTranslucentSystemBars
 import com.osfans.trime.util.iso8601UTCDateTime
 import com.osfans.trime.util.toast
 import kotlinx.coroutines.Dispatchers
@@ -43,35 +48,38 @@ class LogActivity : AppCompatActivity() {
         launcher =
             registerForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
                 lifecycleScope.launch(NonCancellable + Dispatchers.IO) {
-                    uri?.runCatching {
-                        contentResolver.openOutputStream(this)?.use { os ->
-                            os.bufferedWriter().use {
-                                it.write(DeviceInfo.get(this@LogActivity))
-                                it.write(logView.currentLog)
+                    uri
+                        ?.runCatching {
+                            contentResolver.openOutputStream(this)?.use { os ->
+                                os.bufferedWriter().use {
+                                    it.write(DeviceInfo.get(this@LogActivity))
+                                    it.write(logView.currentLog)
+                                }
                             }
-                        }
-                    }?.toast()
+                        }?.let { toast(it) }
                 }
             }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        applyTranslucentSystemBars()
+        enableEdgeToEdge()
         val binding = ActivityLogBinding.inflate(layoutInflater)
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, windowInsets ->
-            val statusBars = windowInsets.getInsets(WindowInsetsCompat.Type.statusBars())
-            val navBars = windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars())
+            val systemBars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
             binding.root.updateLayoutParams<ViewGroup.MarginLayoutParams> {
-                leftMargin = navBars.left
-                rightMargin = navBars.right
-                bottomMargin = navBars.bottom
+                leftMargin = systemBars.left
+                rightMargin = systemBars.right
+                bottomMargin = systemBars.bottom
             }
             binding.logToolbar.toolbar.updateLayoutParams<ViewGroup.MarginLayoutParams> {
-                topMargin = statusBars.top
+                topMargin = systemBars.top
             }
             windowInsets
         }
+        WindowCompat
+            .getInsetsController(window, window.decorView)
+            .isAppearanceLightStatusBars = false
 
         setContentView(binding.root)
         with(binding) {
@@ -80,7 +88,8 @@ class LogActivity : AppCompatActivity() {
             if (intent.hasExtra(FROM_CRASH)) {
                 supportActionBar!!.setTitle(R.string.crash_logs)
                 clearButton.visibility = View.GONE
-                AlertDialog.Builder(this@LogActivity)
+                AlertDialog
+                    .Builder(this@LogActivity)
                     .setTitle(R.string.app_crash)
                     .setMessage(R.string.app_crash_message)
                     .setPositiveButton(android.R.string.ok, null)

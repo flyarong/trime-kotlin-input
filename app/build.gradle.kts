@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 @file:Suppress("UnstableApiUsage")
 
 import org.gradle.configurationcache.extensions.capitalized
@@ -18,11 +22,11 @@ android {
     buildToolsVersion = "34.0.0"
 
     defaultConfig {
-        applicationId  = "com.osfans.trime"
+        applicationId = "com.osfans.trime"
         minSdk = 21
-        targetSdk = 33
-        versionCode = 20240301
-        versionName = "3.2.17"
+        targetSdk = 34
+        versionCode = 20241101
+        versionName = "3.3.1"
 
         multiDexEnabled = true
         setProperty("archivesBaseName", "$applicationId-$buildVersionName")
@@ -36,17 +40,20 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            //proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-android.txt"
-            signingConfig = with(ApkRelease) {
-                if (project.buildApkRelease) {
-                    signingConfigs.create("release") {
-                        storeFile = file(project.storeFile!!)
-                        storePassword = project.storePassword
-                        keyAlias = project.keyAlias
-                        keyPassword = project.keyPassword
+            // proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-android.txt"
+            signingConfig =
+                with(ApkRelease) {
+                    if (project.buildApkRelease) {
+                        signingConfigs.create("release") {
+                            storeFile = file(project.storeFile!!)
+                            storePassword = project.storePassword
+                            keyAlias = project.keyAlias
+                            keyPassword = project.keyPassword
+                        }
+                    } else {
+                        null
                     }
-                } else null
-            }
+                }
 
             resValue("string", "trime_app_name", "@string/app_name_release")
         }
@@ -63,12 +70,12 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
-    
+
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_1_8.toString()
+        jvmTarget = JavaVersion.VERSION_11.toString()
     }
 
     // hack workaround lint gradle 8.0.2
@@ -118,6 +125,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.navigation.fragment)
     implementation(libs.androidx.navigation.ui)
+    implementation(libs.androidx.paging.runtime.ktx)
     implementation(libs.androidx.preference)
     implementation(libs.androidx.recyclerview)
     ksp(libs.androidx.room.compiler)
@@ -125,10 +133,12 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.viewpager2)
     implementation(libs.flexbox)
+    implementation(libs.bravh)
     implementation(libs.kaml)
     implementation(libs.timber)
-    implementation(libs.utilcode)
     implementation(libs.xxpermissions)
+    ksp(libs.kotlin.inject.compiler)
+    implementation(libs.kotlin.inject.runtime)
     implementation(libs.splitties.bitflags)
     implementation(libs.splitties.systemservices)
     implementation(libs.splitties.views.dsl)

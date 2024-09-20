@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.ui.components.log
 
 import android.graphics.Typeface
@@ -16,9 +20,12 @@ import splitties.dimensions.dp
  * This file is adapted from fcitx5-android project.
  * Source: [fcitx5-android/LogAdapter](https://github.com/fcitx5-android/fcitx5-android/blob/5ac719c3547165a3e77fe265c471a5a211580320/app/src/main/java/org/fcitx/fcitx5/android/ui/main/log/LogAdapter.kt)
  */
-class LogAdapter(private val entries: MutableList<CharSequence> = mutableListOf()) :
-    RecyclerView.Adapter<LogAdapter.ViewHolder>() {
-    inner class ViewHolder(val textView: TextView) : RecyclerView.ViewHolder(textView)
+class LogAdapter(
+    private val entries: MutableList<CharSequence> = mutableListOf(),
+) : RecyclerView.Adapter<LogAdapter.ViewHolder>() {
+    inner class ViewHolder(
+        val textView: TextView,
+    ) : RecyclerView.ViewHolder(textView)
 
     fun append(line: CharSequence) {
         val size = entries.size
@@ -39,8 +46,8 @@ class LogAdapter(private val entries: MutableList<CharSequence> = mutableListOf(
     override fun onCreateViewHolder(
         parent: ViewGroup,
         viewType: Int,
-    ): ViewHolder {
-        return ViewHolder(
+    ): ViewHolder =
+        ViewHolder(
             TextView(parent.context).apply {
                 textSize = 12f
                 typeface = Typeface.MONOSPACE
@@ -54,7 +61,6 @@ class LogAdapter(private val entries: MutableList<CharSequence> = mutableListOf(
                     }
             },
         )
-    }
 
     override fun onBindViewHolder(
         holder: ViewHolder,

@@ -1,49 +1,40 @@
-/*
- * Copyright (C) 2015-present, osfans
- * waxaca@163.com https://github.com/osfans
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2015 - 2024 Rime community
+//
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package com.osfans.trime.ime.broadcast
 
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Context.POWER_SERVICE
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build.VERSION
 import android.os.Build.VERSION_CODES
-import android.os.PowerManager
 import android.os.PowerManager.PARTIAL_WAKE_LOCK
-import com.blankj.utilcode.util.ToastUtils
+import android.widget.Toast
+import androidx.core.content.ContextCompat
 import com.osfans.trime.R
 import com.osfans.trime.core.Rime
-import com.osfans.trime.data.AppPrefs
-import com.osfans.trime.ime.core.RimeWrapper
+import com.osfans.trime.daemon.RimeDaemon
+import com.osfans.trime.data.prefs.AppPrefs
+import com.osfans.trime.util.toast
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import splitties.systemservices.alarmManager
+import splitties.systemservices.powerManager
 import timber.log.Timber
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 /** 接收 Intent 廣播事件  */
-class IntentReceiver : BroadcastReceiver(), CoroutineScope by MainScope() {
+class IntentReceiver :
+    BroadcastReceiver(),
+    CoroutineScope by MainScope() {
     override fun onReceive(
         context: Context,
         intent: Intent,
@@ -54,22 +45,21 @@ class IntentReceiver : BroadcastReceiver(), CoroutineScope by MainScope() {
             COMMAND_DEPLOY ->
                 launch {
                     withContext(Dispatchers.IO) {
-                        RimeWrapper.deploy()
+                        RimeDaemon.restartRime(true)
                     }
-                    ToastUtils.showLong(R.string.deploy_finish)
+                    context.toast(R.string.deploy_finish, Toast.LENGTH_LONG)
                 }
             COMMAND_SYNC ->
                 launch {
                     withContext(Dispatchers.IO) {
                         Rime.syncRimeUserData()
-                        RimeWrapper.deploy()
+                        RimeDaemon.restartRime(true)
                     }
                 }
             COMMAND_TIMING_SYNC ->
                 launch {
                     withContext(Dispatchers.IO) {
                         // 获取唤醒锁
-                        val powerManager = context.getSystemService(POWER_SERVICE) as PowerManager
                         val wakeLock =
                             powerManager.newWakeLock(PARTIAL_WAKE_LOCK, "com.osfans.trime:WakeLock")
                         wakeLock.acquire(600000) // 10分钟超时
@@ -77,35 +67,36 @@ class IntentReceiver : BroadcastReceiver(), CoroutineScope by MainScope() {
                         val triggerTime = cal.timeInMillis + TimeUnit.DAYS.toMillis(1) // 下次同步时间
                         AppPrefs.defaultInstance().profile.timingSyncTriggerTime =
                             triggerTime // 更新定时同步偏好值
-                        val alarmManager =
-                            context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
                         // 设置待发送的同步事件
                         val pendingIntent =
                             PendingIntent.getBroadcast(
                                 context,
                                 0,
-                                Intent("com.osfans.trime.timing.sync"),
+                                Intent(COMMAND_TIMING_SYNC),
                                 if (VERSION.SDK_INT >= VERSION_CODES.M) {
                                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                                 } else {
                                     PendingIntent.FLAG_UPDATE_CURRENT
                                 },
                             )
-                        if (VERSION.SDK_INT >= VERSION_CODES.M) { // 根据SDK设置alarm任务
-                            alarmManager.setExactAndAllowWhileIdle(
-                                AlarmManager.RTC_WAKEUP,
-                                triggerTime,
-                                pendingIntent,
-                            )
-                        } else {
-                            alarmManager.setExact(
-                                AlarmManager.RTC_WAKEUP,
-                                triggerTime,
-                                pendingIntent,
-                            )
+                        if (VERSION.SDK_INT < VERSION_CODES.S || alarmManager.canScheduleExactAlarms()) {
+                            if (VERSION.SDK_INT >= VERSION_CODES.M) { // 根据SDK设置alarm任务
+                                alarmManager.setExactAndAllowWhileIdle(
+                                    AlarmManager.RTC_WAKEUP,
+                                    triggerTime,
+                                    pendingIntent,
+                                )
+                            } else {
+                                alarmManager.setExact(
+                                    AlarmManager.RTC_WAKEUP,
+                                    triggerTime,
+                                    pendingIntent,
+                                )
+                            }
                         }
+
                         Rime.syncRimeUserData()
-                        RimeWrapper.deploy()
+                        RimeDaemon.restartRime(true)
                         wakeLock.release() // 释放唤醒锁
                     }
                 }
@@ -114,9 +105,24 @@ class IntentReceiver : BroadcastReceiver(), CoroutineScope by MainScope() {
     }
 
     fun registerReceiver(context: Context) {
-        context.registerReceiver(this, IntentFilter(COMMAND_DEPLOY))
-        context.registerReceiver(this, IntentFilter(COMMAND_SYNC))
-        context.registerReceiver(this, IntentFilter(COMMAND_TIMING_SYNC))
+        ContextCompat.registerReceiver(
+            context,
+            this,
+            IntentFilter(COMMAND_DEPLOY),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        ContextCompat.registerReceiver(
+            context,
+            this,
+            IntentFilter(COMMAND_SYNC),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        ContextCompat.registerReceiver(
+            context,
+            this,
+            IntentFilter(COMMAND_TIMING_SYNC),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
         context.registerReceiver(this, IntentFilter(Intent.ACTION_SHUTDOWN))
     }
 

@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
+
+<!--
+SPDX-FileCopyrightText: 2015 - 2024 Rime community
+
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <PreferenceCategory android:title="@string/storage"
         app:iconSpaceReserved="false" >
-        <com.osfans.trime.ui.components.FolderPickerPreference
-            android:key="profile_shared_data_dir"
-            app:iconSpaceReserved="false"
-            android:title="@string/profile_shared_data_dir"
-            app:persistent="true"
-            app:useSimpleSummaryProvider="true" />
 
         <com.osfans.trime.ui.components.FolderPickerPreference
             android:key="profile_user_data_dir"
